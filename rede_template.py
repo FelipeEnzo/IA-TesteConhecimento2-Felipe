@@ -46,7 +46,7 @@ def normalizar(entrega_bruta, divisores):
 
 def relu(z):
     """TODO: ReLU(z) = max(0, z), elemento a elemento."""
-    return np.max(0, z)
+    return np.maximum(0, z)
 
 
 def tanh(z):
@@ -70,10 +70,9 @@ def camada(W, b, x, ativacao):
     W = np.array(W, dtype=float)
     b = np.array(b, dtype=float)
     x = np.array(x, dtype=float)
-    z = W * x + b
-    ativacao = relu 
+    z = W @ x + b
     h = ativacao(z)
-    return [z, h]
+    return z, h
 
 
 def propagar(rede, x):
@@ -83,31 +82,20 @@ def propagar(rede, x):
     "z1", "h1", "z2", "h2", "z3", "p"  (p = probabilidades da saída).
     Ativações: camada 1 -> ReLU, camada 2 -> tanh, camada 3 -> softmax.
     """
-    ativacoes = {'A0': X}
-
-    for l in range(1, L): 
-        A_prev = ativacoes[f'A{l-1}']
-
-        W = rede[f'W{l}']
-        b = rede[f'b{l}']
-
-        Z = np.dot(A_prev, W.T) + b
-
-        A = relu(Z)
-
-        ativacoes[f'Z{l}'] = Z
-        ativacoes[f'A{l}'] = A
-    
-    A_prev = ativacoes[f'A{L-1}']
-    W = rede[f'W{L}']
-    b = rede[f'b{L}']
-
-    Z = np.dot(A_prev, W.T) + 
+    x = np.array(x, dtype=float)
+    z1, h1 = camada(rede["W1"], rede["b1"],x, relu)
+    z2, h2 = camada(rede["W2"], rede["b2"], h1, tanh)
+    z3, p = camada(rede["W3"], rede["b3"], h2, softmax)
+    return {"z1": z1, "h1": h1, "z2": z2, "h2": h2, "z3": z3, "p": p}
 
 
 def classificar(rede, x):
     """TODO: devolva (nome_da_classe, probabilidade) da classe mais provável."""
-    raise NotImplementedError("classificar")
+    p = propagar(rede, x)["p"]
+    idx = int(np.argmax(p))
+    return rede["classes"][idx], float(p[idx])
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -159,3 +147,40 @@ if __name__ == "__main__":
                   f" | real = {linha.modalidade_real}")
     except NotImplementedError as e:
         print(f"\nFunção ainda não implementada: {e}()")
+
+# Exercicios
+rede = carregar_rede()
+x = np.array([0.50, 0.70, 0.40, 0.30])
+r = propagar(rede, x)
+
+print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaz1:", np.round(r["z1"], 4))
+print("h1:", np.round(r["h1"], 4))
+print("zeros:", int(np.sum(r["h1"] == 0)))
+print("z2:", np.round(r["z2"], 4))
+print("h2:", np.round(r["h2"], 4))
+print("z3:", np.round(r["z3"], 4))
+print("p:", np.round(r["p"], 4))
+
+encomenda = [150, 3, 0.95, 1200]
+divisores = [1000, 30, 1, 5000]
+x = normalizar(encomenda, divisores)
+print("Vetor normalizado x:", x)
+print("Classe prevista e probabilidade:", classificar(rede, x))
+
+df = pd.read_csv("entregas_teste_rede.csv")
+acertos = 0
+erradas = []
+classe_prevista = []
+for _, linha in df.iterrows():
+    bruta = [linha.distancia_km, linha.peso_kg, linha.urgencia, linha.valor_declarado]
+    x = normalizar(bruta, rede["normalizacao_divisor"])
+    classe, prob = classificar(rede, x)
+
+    if classe == linha.modalidade_real:
+        acertos += 1
+    else:
+        erradas.append(linha.id_entrega)
+        classe_prevista.append(classe)
+print(f"acuracia total: {acertos / len(df) * 100:.2f}%")
+print(f"Entregas classificadas incorretamente foram as entregas {erradas} com classe prevista {classe_prevista}")
+
